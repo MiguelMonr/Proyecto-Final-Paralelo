@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
     const string output_file_name = argv[4];
 
     // Initialiazing number of iterations for testing process
-    const int ejecuciones = 10;
+    const int ejecuciones = 6;
 
     // Initialiazing acumulate time value variable
     double total_time = 0.0;
