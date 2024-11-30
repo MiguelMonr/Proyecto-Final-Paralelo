@@ -54,7 +54,7 @@ void readVocabulary(const string &filename, vector<string> &vocabulary)
 /*
     FUNCTION: Count words
 */
-void countWords(const vector<string> &files, const vector<string> &vocabulary, vector<vector<string>> &matriz)
+void countWords(const vector<string> &files, const vector<string> &vocabulary, vector<vector<string> > &matriz)
 {
 
     // For-loop to iterate over all files names vector
@@ -115,7 +115,7 @@ void countWords(const vector<string> &files, const vector<string> &vocabulary, v
 /*
     FUNCTION: Write Matrix to a CSV
 */
-void writeMatrixToCSV(const std::string &filename, std::vector<std::vector<std::string>> matriz, int rows, int cols)
+void writeMatrixToCSV(const std::string &filename, std::vector<std::vector<std::string> > matriz, int rows, int cols)
 {
 
     // Opening an output file stream for writing the CSV file
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
 
     // Here the word counts are stored: 7 rows for 7 books,
     // columns contain the word and the count of how many times it appears
-    vector<vector<string>> matriz(7, vector<string>(tamanio_voc));
+    vector<vector<string> > matriz(7, vector<string>(tamanio_voc));
 
     if (process_id == 0)
     {
@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
     }
 
     // MPI_Gather to collect the counted words from each process
-    vector<vector<string>> all(matriz);
+    vector<vector<string> > all(matriz);
 
     /*
         MPI_Gather is a collective communication function in the MPI used in parallel
