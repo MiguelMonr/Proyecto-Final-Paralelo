@@ -1,0 +1,6 @@
+../libros/dickens_a_christmas_carol.txt
+../libros/dickens_a_tale_of_two_cities.txt
+../libros/dickens_oliver_twist.txt
+../libros/shakespeare_hamlet.txt
+../libros/shakespeare_romeo_juliet.txt
+../libros/shakespeare_the_merchant_of_venice.txt
