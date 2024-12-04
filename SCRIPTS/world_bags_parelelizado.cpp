@@ -8,6 +8,8 @@
 #include <chrono>
 #include <iterator>
 #include <cctype>
+#include <mpi.h>
+
 using namespace std;
 
 void readVocabulary(const string& filename, vector<string>& vocabulary) {
@@ -66,7 +68,7 @@ void writeMatrixToCSV(const std::string& filename, std::vector<std::vector<std::
 void calculateAverageTime(double total_time, int ejecuciones) {
     double avg_time = (total_time / ejecuciones) / 1000;
     cout << "Promedio de tiempo de ejecucion: " << avg_time << " segundos" << endl;
-    ofstream csv_file("tiempo_serial.csv");
+    ofstream csv_file("tiempo_paralelo.csv");
     if (csv_file.is_open()) {
         csv_file << avg_time;
         csv_file.close();
@@ -88,9 +90,18 @@ std::vector<std::string> readFileNames(const std::string& filename) {
     return lines;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
+    MPI_Init(&argc, &argv);
+    int num_processes = 6;
+    int process_id;
+    MPI_Comm_size(MPI_COMM_WORLD, &num_processes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
+
     if (argc < 5) {
-        cerr << "Usage: " << argv[0] << "<listado_nombres_archivos.txt> <archivo_vocabulario.txt> <tamanio_vocabulario> <output_file.csv> \n";
+        if (process_id == 0) {
+            cerr << "Usage: " << argv[0] << " <listado_nombres_archivos.txt> <archivo_vocabulario.txt> <tamanio_vocabulario> <output_file.csv>\n";
+        }
+        MPI_Finalize();
         return 1;
     }
 
@@ -100,33 +111,62 @@ int main(int argc, char *argv[]) {
     const string output_file_name = argv[4];
     const int ejecuciones = 10;
     double total_time = 0.0;
-    vector<string> vocabulary;
 
-    readVocabulary(arch_vocabulario, vocabulary);
+    vector<string> vocabulary;
+    vector<string> files;
+
+    if (process_id == 0) {
+        readVocabulary(arch_vocabulario, vocabulary);
+        files = readFileNames(files_names);
+    }
+
+    int vocab_size = vocabulary.size();
+    MPI_Bcast(&vocab_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (process_id != 0) {
+        vocabulary.resize(vocab_size);
+    }
+
+    for (int i = 0; i < vocab_size; i++) {
+        int len;
+        if (process_id == 0) {
+            len = vocabulary[i].length();
+        }
+        MPI_Bcast(&len, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        if (process_id != 0) {
+            vocabulary[i].resize(len);
+        }
+        MPI_Bcast(const_cast<char*>(vocabulary[i].data()), len, MPI_CHAR, 0, MPI_COMM_WORLD);
+    }
 
     vector<vector<string>> matriz(7, vector<string>(tamanio_voc));
-    copy(vocabulary.begin(), vocabulary.end(), matriz[0].begin());
-    std::vector<std::string> files = readFileNames(files_names);
-
-    std::ofstream csvFile("iteration_times_serial.csv");
-    if (!csvFile.is_open()) {
-        cerr << "Failed to open iteration times file." << endl;
-        return 1;
+    if (process_id == 0) {
+        copy(vocabulary.begin(), vocabulary.end(), matriz[0].begin());
     }
 
-    csvFile << "Iteration Time Serial (ms)";
+    vector<vector<string>> all(matriz);
+    MPI_Gather(matriz.data() + 1, 6, MPI_DOUBLE, all.data() + 1, 6, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    double start_time;
+    double end_time;
+
     for (int i = 0; i < ejecuciones; i++) {
-        auto start_time = chrono::high_resolution_clock::now();
+        start_time = MPI_Wtime();
         countWords(files, vocabulary, matriz);
-        writeMatrixToCSV(output_file_name, matriz, 7, tamanio_voc);
-        auto end_time = chrono::high_resolution_clock::now();
-        double iteration_time = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
-        total_time += iteration_time;
+        if (process_id == 0) {
+            writeMatrixToCSV(output_file_name, all, 7, tamanio_voc);
+        }
+        end_time = MPI_Wtime();
+        double iteration_time = end_time - start_time;
+        double total_iteration_time = 0.0;
         cout << "Tiempo de ejecucion: " << iteration_time / 1000 << " segundos \n";
-        csvFile << "," << iteration_time;
+        MPI_Reduce(&iteration_time, &total_iteration_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (process_id == 0) {
+            total_time += iteration_time;
+        }
     }
-    csvFile.close();
-    calculateAverageTime(total_time, ejecuciones);
 
+    calculateAverageTime(total_time, ejecuciones);
+    MPI_Finalize();
     return 0;
 }
